@@ -1,14 +1,19 @@
 import { Action, ActionPanel, Detail, showToast, Toast, Clipboard } from "@raycast/api";
 import { homedir } from "os";
 import QRCode from "qrcode";
-import { QR_OPTIONS, QR_OPTIONS_PREVIEW, SVG_OPTIONS } from "./config";
+import { buildQrOptions, buildSvgOptions, DEFAULT_COLOR } from "./config";
 import { showFailureToast } from "@raycast/utils";
 import fs from "fs";
 import os from "os";
 import path from "path";
 
-export async function generateQRCode(options: { URL?: string; format?: "png" | "svg"; preview?: boolean }) {
-  const { URL, format = "png", preview = false } = options;
+export async function generateQRCode(options: {
+  URL?: string;
+  format?: "png" | "svg";
+  preview?: boolean;
+  color?: string;
+}) {
+  const { URL, format = "png", preview = false, color = DEFAULT_COLOR } = options;
   await showToast({
     title: "Generating",
     message: "Generating QR Code...",
@@ -16,7 +21,7 @@ export async function generateQRCode(options: { URL?: string; format?: "png" | "
   });
 
   if (URL === undefined) {
-    await showFailureToast({ title: "An error occurred", message: "URL is undefined" });
+    await showFailureToast(new Error("URL is undefined"), { title: "An error occurred" });
     return;
   }
 
@@ -25,12 +30,11 @@ export async function generateQRCode(options: { URL?: string; format?: "png" | "
     if (format === "svg") {
       const svg = await QRCode.toString(URL, {
         type: "svg",
-        width: SVG_OPTIONS.width,
-        color: SVG_OPTIONS.color,
+        ...buildSvgOptions({ color }),
       });
       result = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
     } else {
-      result = await QRCode.toDataURL(URL, preview ? QR_OPTIONS_PREVIEW : QR_OPTIONS);
+      result = await QRCode.toDataURL(URL, buildQrOptions({ color, preview }));
     }
     await showToast({
       title: "Generated successfully!",
@@ -38,10 +42,7 @@ export async function generateQRCode(options: { URL?: string; format?: "png" | "
     });
     return result;
   } catch (error) {
-    await showFailureToast({
-      title: "Error",
-      message: error instanceof Error ? error.message : "Failed to generate QR code",
-    });
+    await showFailureToast(error, { title: "Failed to generate QR code" });
     throw error;
   }
 }
@@ -70,15 +71,18 @@ export const getQRCodePath = (qrcodeUrl: string, format: "png" | "svg" = "png") 
   return `${homedir()}/Downloads/qrcode-${filename}.${format}`;
 };
 
-export async function copyQRCodeToClipboard(options: { url: string; format: "png" | "svg" | "png-bg" }): Promise<void> {
-  const { url, format } = options;
+export async function copyQRCodeToClipboard(options: {
+  url: string;
+  format: "png" | "svg" | "png-bg";
+  color?: string;
+}): Promise<void> {
+  const { url, format, color = DEFAULT_COLOR } = options;
 
   try {
     if (format === "svg") {
       const svg = await QRCode.toString(url, {
         type: "svg",
-        width: SVG_OPTIONS.width,
-        color: SVG_OPTIONS.color,
+        ...buildSvgOptions({ color }),
       });
       const fileName = `qrcode-${Date.now()}.svg`;
       const filePath = path.join(os.tmpdir(), fileName);
@@ -88,19 +92,12 @@ export async function copyQRCodeToClipboard(options: { url: string; format: "png
     } else {
       const fileName = `qrcode-${Date.now()}.png`;
       const filePath = path.join(os.tmpdir(), fileName);
-      if (format === "png-bg") {
-        await QRCode.toFile(filePath, url, QR_OPTIONS_PREVIEW);
-      } else {
-        await QRCode.toFile(filePath, url, QR_OPTIONS);
-      }
+      await QRCode.toFile(filePath, url, buildQrOptions({ color, preview: format === "png-bg" }));
       await Clipboard.copy({ file: filePath });
       await showToast(Toast.Style.Success, "QR Code copied to clipboard");
     }
   } catch (error) {
-    await showFailureToast({
-      title: "Error",
-      message: error instanceof Error ? error.message : "Failed to copy QR code",
-    });
+    await showFailureToast(error, { title: "Failed to copy QR code" });
     throw error;
   }
 }
