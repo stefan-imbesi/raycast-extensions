@@ -111,7 +111,8 @@
     "dev": "ray develop",
     "fix-lint": "ray lint --fix",
     "lint": "ray lint",
-    "publish": "npx @raycast/api@latest publish"
+    "publish": "npx @raycast/api@latest publish",
+    "test:features": "npm install --no-save sharp jsqr && node scripts/test-features.mjs"
   },
   "platforms": [
     "macOS",
