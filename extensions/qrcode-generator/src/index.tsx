@@ -235,12 +235,13 @@ export default function Command() {
         <Form.Dropdown.Item value={CUSTOM_COLOR_VALUE} title="Custom…" />
       </Form.Dropdown>
       {values.color === CUSTOM_COLOR_VALUE && (
-        <Form.TextField title="Custom Color (Hex)" placeholder="#1D8348 or 1D8348" {...itemProps.customColor} />
-      )}
-      {showLowContrast && (
-        <Form.Description
-          title="⚠ Low contrast"
-          text="This color is quite light and may be hard to scan. It will still generate — consider a darker color."
+        <Form.TextField
+          title="Custom Color (Hex)"
+          placeholder="#1D8348 or 1D8348"
+          {...itemProps.customColor}
+          // Red like other field errors. Invalid hex (in `validation`) blocks submit; the
+          // low-contrast message is set here only for display, so it warns without blocking.
+          error={itemProps.customColor.error ?? (showLowContrast ? "Low contrast — may be hard to scan" : undefined)}
         />
       )}
       <Form.Checkbox
