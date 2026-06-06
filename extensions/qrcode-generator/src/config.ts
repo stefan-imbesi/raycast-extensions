@@ -15,10 +15,16 @@ export const COLOR_PRESETS: { title: string; value: string }[] = [
 /** Sentinel value used by the dropdown to reveal the custom hex field. */
 export const CUSTOM_COLOR_VALUE = "custom";
 
-const HEX_REGEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+// Accept hex with or without a leading "#", in 3- or 6-digit form.
+const HEX_REGEX = /^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 export function isValidHexColor(value: string | undefined): value is string {
   return typeof value === "string" && HEX_REGEX.test(value.trim());
+}
+
+/** Ensure a valid hex value carries a leading "#" so the qrcode library can parse it. */
+export function normalizeHexColor(value: string): string {
+  return `#${value.trim().replace(/^#/, "")}`;
 }
 
 function normalizeHex(hex: string): string {
@@ -59,7 +65,7 @@ export function buildQrOptions(options: { color?: QRColor; preview?: boolean } =
   return {
     width: 512,
     color: {
-      dark: color,
+      dark: normalizeHexColor(color),
       light: preview ? "#FFFFFF" : "#00000000", // white bg for preview, transparent otherwise
     },
   } as const;
@@ -71,7 +77,7 @@ export function buildSvgOptions(options: { color?: QRColor } = {}) {
   return {
     width: 1536,
     color: {
-      dark: color,
+      dark: normalizeHexColor(color),
       light: "none",
     },
   } as const;

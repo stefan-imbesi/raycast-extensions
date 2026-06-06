@@ -11,6 +11,7 @@ import {
   DEFAULT_COLOR,
   isLowContrast,
   isValidHexColor,
+  normalizeHexColor,
 } from "./config";
 import { appendUtmParams, isHttpUrl, shortenUrl } from "./url";
 import { copyQRCodeToClipboard, generateQRCode, getQRCodePath, QRCodeView } from "./utils";
@@ -53,16 +54,14 @@ export default function Command() {
       customColor: initialColor,
     },
     async onSubmit(values) {
-      const color = resolveColor(values);
-
-      if (isLowContrast(color)) {
-        await showToast({
-          style: Toast.Style.Failure,
-          title: "Low contrast color",
-          message: "This color may be hard to scan against a light background.",
+      if (values.color === CUSTOM_COLOR_VALUE && !isValidHexColor(values.customColor)) {
+        await showFailureToast(new Error("Enter a valid hex color, e.g. #1D8348 or 1D8348"), {
+          title: "Invalid color",
         });
+        return;
       }
 
+      const color = resolveColor(values);
       const url = await prepareUrl(values);
 
       if (values.inline) {
@@ -104,20 +103,19 @@ export default function Command() {
     validation: {
       url: FormValidation.Required,
       format: FormValidation.Required,
-      customColor: (value) => {
-        if (values.color === CUSTOM_COLOR_VALUE && !isValidHexColor(value)) {
-          return "Enter a valid hex color, e.g. #1D8348";
-        }
-      },
     },
   });
 
   function resolveColor(values: FormValues): string {
     if (values.color === CUSTOM_COLOR_VALUE) {
-      return isValidHexColor(values.customColor) ? values.customColor.trim() : DEFAULT_COLOR;
+      return isValidHexColor(values.customColor) ? normalizeHexColor(values.customColor) : DEFAULT_COLOR;
     }
-    return values.color;
+    return normalizeHexColor(values.color);
   }
+
+  // Persistent, reactive low-contrast warning (a toast here would be overwritten by the generate toasts).
+  const selectedColorRaw = values.color === CUSTOM_COLOR_VALUE ? values.customColor : values.color;
+  const showLowContrast = isValidHexColor(selectedColorRaw) && isLowContrast(normalizeHexColor(selectedColorRaw));
 
   async function prepareUrl(values: FormValues): Promise<string> {
     let url = values.url;
@@ -225,14 +223,20 @@ export default function Command() {
         <Form.Dropdown.Item value="png-bg" title="PNG (w/BG)" />
         <Form.Dropdown.Item value="svg" title="SVG" />
       </Form.Dropdown>
-      <Form.Dropdown title="QR Color" storeValue {...itemProps.color}>
+      <Form.Dropdown title="QR Color" {...itemProps.color}>
         {COLOR_PRESETS.map((preset) => (
           <Form.Dropdown.Item key={preset.value} value={preset.value} title={preset.title} />
         ))}
         <Form.Dropdown.Item value={CUSTOM_COLOR_VALUE} title="Custom…" />
       </Form.Dropdown>
       {values.color === CUSTOM_COLOR_VALUE && (
-        <Form.TextField title="Custom Color (Hex)" placeholder="#1D8348" {...itemProps.customColor} />
+        <Form.TextField title="Custom Color (Hex)" placeholder="#1D8348 or 1D8348" {...itemProps.customColor} />
+      )}
+      {showLowContrast && (
+        <Form.Description
+          title="⚠ Low contrast"
+          text="This color is quite light and may be hard to scan. Consider a darker color."
+        />
       )}
       <Form.Checkbox
         label="Shorten link (is.gd)"
