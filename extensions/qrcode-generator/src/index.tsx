@@ -233,7 +233,7 @@ export default function Command() {
         {...itemProps.color}
         // Low-contrast warning lives on the (unfocused) dropdown so it renders inline like other
         // field errors, instead of as a focused-field popover on the hex input. Non-blocking.
-        error={showLowContrast ? "Low contrast — may be hard to scan" : undefined}
+        error={showLowContrast ? "Low contrast" : undefined}
       >
         {COLOR_PRESETS.map((preset) => (
           <Form.Dropdown.Item key={preset.value} value={preset.value} title={preset.title} />
