@@ -5,7 +5,8 @@
 - Fixed error toasts showing "[object Object]" instead of the actual error message
 - Added distinct icons per command for easier recognition in Raycast
 - Added the ability to choose the QR code color (presets or custom hex) with a low-contrast warning
-- Added an opt-in link shortener (is.gd, with TinyURL fallback) to keep QR codes simple for long URLs
+- Added an opt-in link shortener (is.gd, da.gd, then TinyURL) to keep QR codes simple for long URLs
+- Added color-chip previews in the color dropdown
 - Added optional UTM tracking parameters
 
 ## [Improve UX] - 2025-12-27

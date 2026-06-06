@@ -1,4 +1,4 @@
-import { Action, ActionPanel, Form, getPreferenceValues, open, showToast, Toast } from "@raycast/api";
+import { Action, ActionPanel, Form, getPreferenceValues, Icon, open, showToast, Toast } from "@raycast/api";
 import { FormValidation, showFailureToast, useForm } from "@raycast/utils";
 import { useRef, useState } from "react";
 import {
@@ -94,15 +94,15 @@ export default function Command() {
   const { primaryAction, defaultColor } = getPreferenceValues<Preferences["Index"]>();
   const [qrData, setQrData] = useState<string>();
 
-  const initialColor = isValidHexColor(defaultColor) ? defaultColor : DEFAULT_COLOR;
-  const matchedPreset = COLOR_PRESETS.find((preset) => preset.value.toLowerCase() === initialColor.toLowerCase());
+  // The default-color preference pre-fills the custom field; the form opens directly in Custom mode.
+  const initialColor = isValidHexColor(defaultColor) ? normalizeHexColor(defaultColor) : DEFAULT_COLOR;
 
   // Tracks the current dropdown selection so customColor validation only fires when "Custom…" is active.
-  const colorModeRef = useRef<string>(matchedPreset ? matchedPreset.value : CUSTOM_COLOR_VALUE);
+  const colorModeRef = useRef<string>(CUSTOM_COLOR_VALUE);
 
   const { handleSubmit, itemProps, values } = useForm<FormValues>({
     initialValues: {
-      color: matchedPreset ? matchedPreset.value : CUSTOM_COLOR_VALUE,
+      color: CUSTOM_COLOR_VALUE,
       customColor: initialColor,
     },
     async onSubmit(values) {
@@ -236,9 +236,22 @@ export default function Command() {
         error={showLowContrast ? "Low contrast" : undefined}
       >
         {COLOR_PRESETS.map((preset) => (
-          <Form.Dropdown.Item key={preset.value} value={preset.value} title={preset.title} />
+          <Form.Dropdown.Item
+            key={preset.value}
+            value={preset.value}
+            title={preset.title}
+            icon={{ source: Icon.CircleFilled, tintColor: preset.value }}
+          />
         ))}
-        <Form.Dropdown.Item value={CUSTOM_COLOR_VALUE} title="Custom…" />
+        <Form.Dropdown.Item
+          value={CUSTOM_COLOR_VALUE}
+          title="Custom…"
+          icon={
+            isValidHexColor(values.customColor)
+              ? { source: Icon.CircleFilled, tintColor: normalizeHexColor(values.customColor) }
+              : Icon.Circle
+          }
+        />
       </Form.Dropdown>
       {values.color === CUSTOM_COLOR_VALUE && (
         <Form.TextField title="Custom Color (Hex)" placeholder="#1D8348 or 1D8348" {...itemProps.customColor} />
@@ -246,7 +259,7 @@ export default function Command() {
       <Form.Checkbox
         label="Shorten link"
         {...itemProps.shorten}
-        info="Sends the URL to is.gd (then TinyURL) to create a short link."
+        info="Sends the URL to a link shortener (is.gd, da.gd, then TinyURL) to create a short link."
       />
       <Form.Separator />
       <Form.Checkbox label="Add tracking parameters (UTM)" {...itemProps.utmEnabled} />

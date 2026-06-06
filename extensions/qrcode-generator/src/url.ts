@@ -44,9 +44,11 @@ export function appendUtmParams(value: string, params: UtmParams): string {
   return url.toString();
 }
 
-/** URL shorteners that need no API key. Tried in order; first success wins. */
+/** URL shorteners that need no API key. Tried in order; first success wins.
+ *  is.gd and da.gd do direct 301 redirects; TinyURL may show an interstitial, so it's last. */
 const SHORTENERS: { name: string; build: (url: string) => string }[] = [
   { name: "is.gd", build: (u) => `https://is.gd/create.php?format=simple&url=${encodeURIComponent(u)}` },
+  { name: "da.gd", build: (u) => `https://da.gd/shorten?url=${encodeURIComponent(u)}` },
   { name: "TinyURL", build: (u) => `https://tinyurl.com/api-create.php?url=${encodeURIComponent(u)}` },
 ];
 
@@ -70,7 +72,7 @@ async function requestShort(endpoint: string): Promise<string> {
 }
 
 /**
- * Shorten a URL via a no-key service (is.gd, then TinyURL as fallback).
+ * Shorten a URL via a no-key service (is.gd, then da.gd, then TinyURL).
  * Throws with the collected provider errors if all fail.
  */
 export async function shortenUrl(value: string): Promise<string> {
@@ -79,7 +81,9 @@ export async function shortenUrl(value: string): Promise<string> {
     try {
       return await requestShort(build(value));
     } catch (error) {
-      errors.push(`${name}: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[qrcode-generator] ${name} shortener failed: ${message}`);
+      errors.push(`${name}: ${message}`);
     }
   }
   throw new Error(`Could not shorten link (${errors.join("; ")})`);
