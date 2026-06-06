@@ -142,17 +142,18 @@ export default function Command() {
     validation: {
       url: (value) => (value && value.trim() ? undefined : "URL or content is required"),
       format: FormValidation.Required,
-      // Inline (red) feedback for the custom hex field — invalid format or a color too light to scan.
+      // Inline (red) error for an unparseable custom hex — that genuinely can't render.
       customColor: (value) => {
         if (colorModeRef.current !== CUSTOM_COLOR_VALUE) return undefined;
-        if (!isValidHexColor(value)) return "Enter a valid hex color, e.g. #1D8348 or 1D8348";
-        if (isLowContrast(value)) return "Low contrast — this color may be too light to scan";
-        return undefined;
+        return isValidHexColor(value) ? undefined : "Enter a valid hex color, e.g. #1D8348 or 1D8348";
       },
     },
   });
 
   colorModeRef.current = values.color;
+
+  // Non-blocking warning: a valid-but-light color can still be generated, but may not scan well.
+  const showLowContrast = isLowContrast(selectedColor(values));
 
   const renderActions = () => {
     const saveAction = (
@@ -235,6 +236,12 @@ export default function Command() {
       </Form.Dropdown>
       {values.color === CUSTOM_COLOR_VALUE && (
         <Form.TextField title="Custom Color (Hex)" placeholder="#1D8348 or 1D8348" {...itemProps.customColor} />
+      )}
+      {showLowContrast && (
+        <Form.Description
+          title="⚠ Low contrast"
+          text="This color is quite light and may be hard to scan. It will still generate — consider a darker color."
+        />
       )}
       <Form.Checkbox
         label="Shorten link"
