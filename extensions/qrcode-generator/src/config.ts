@@ -35,6 +35,11 @@ export function normalizeHexColor(value: string): string {
   return `#${hex}`;
 }
 
+/** Resolve a user/preference color (possibly hash-less or 3-digit) to a normalized hex, else the default. */
+export function resolveColorPreference(value: string | undefined): string {
+  return isValidHexColor(value) ? normalizeHexColor(value) : DEFAULT_COLOR;
+}
+
 /** Relative luminance (0 = black, 1 = white) per WCAG. */
 export function relativeLuminance(hex: string): number {
   const value = normalizeHexColor(hex).slice(1); // 6 digits, no "#"

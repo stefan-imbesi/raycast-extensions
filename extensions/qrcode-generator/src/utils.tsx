@@ -7,6 +7,25 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
+/** Render a QR code as an SVG string in the given color. */
+function renderSvg(content: string, color: string): Promise<string> {
+  return QRCode.toString(content, { type: "svg", ...buildSvgOptions({ color }) });
+}
+
+/** Write a QR code to `filePath` (SVG text or PNG; `png-bg` adds a white background). */
+async function writeQRCodeFile(
+  filePath: string,
+  content: string,
+  format: "png" | "svg" | "png-bg",
+  color: string,
+): Promise<void> {
+  if (format === "svg") {
+    fs.writeFileSync(filePath, await renderSvg(content, color), "utf-8");
+  } else {
+    await QRCode.toFile(filePath, content, buildQrOptions({ color, preview: format === "png-bg" }));
+  }
+}
+
 export async function generateQRCode(options: {
   URL?: string;
   format?: "png" | "svg";
@@ -28,10 +47,7 @@ export async function generateQRCode(options: {
   try {
     let result;
     if (format === "svg") {
-      const svg = await QRCode.toString(URL, {
-        type: "svg",
-        ...buildSvgOptions({ color }),
-      });
+      const svg = await renderSvg(URL, color);
       result = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
     } else {
       result = await QRCode.toDataURL(URL, buildQrOptions({ color, preview }));
@@ -79,16 +95,10 @@ export async function saveQRCode(options: {
 }): Promise<string> {
   const { url, format, color = DEFAULT_COLOR } = options;
   const basePath = getQRCodePath(url, "png");
+  const filePath = format === "svg" ? basePath.replace(/\.png$/, ".svg") : basePath;
 
-  if (format === "svg") {
-    const svg = await QRCode.toString(url, { type: "svg", ...buildSvgOptions({ color }) });
-    const svgPath = basePath.replace(/\.png$/, ".svg");
-    fs.writeFileSync(svgPath, svg);
-    return svgPath;
-  }
-
-  await QRCode.toFile(basePath, url, buildQrOptions({ color, preview: format === "png-bg" }));
-  return basePath;
+  await writeQRCodeFile(filePath, url, format, color);
+  return filePath;
 }
 
 export async function copyQRCodeToClipboard(options: {
@@ -99,23 +109,11 @@ export async function copyQRCodeToClipboard(options: {
   const { url, format, color = DEFAULT_COLOR } = options;
 
   try {
-    if (format === "svg") {
-      const svg = await QRCode.toString(url, {
-        type: "svg",
-        ...buildSvgOptions({ color }),
-      });
-      const fileName = `qrcode-${Date.now()}.svg`;
-      const filePath = path.join(os.tmpdir(), fileName);
-      fs.writeFileSync(filePath, svg, "utf-8");
-      await Clipboard.copy({ file: filePath });
-      await showToast(Toast.Style.Success, "QR Code copied to clipboard");
-    } else {
-      const fileName = `qrcode-${Date.now()}.png`;
-      const filePath = path.join(os.tmpdir(), fileName);
-      await QRCode.toFile(filePath, url, buildQrOptions({ color, preview: format === "png-bg" }));
-      await Clipboard.copy({ file: filePath });
-      await showToast(Toast.Style.Success, "QR Code copied to clipboard");
-    }
+    const ext = format === "svg" ? "svg" : "png";
+    const filePath = path.join(os.tmpdir(), `qrcode-${Date.now()}.${ext}`);
+    await writeQRCodeFile(filePath, url, format, color);
+    await Clipboard.copy({ file: filePath });
+    await showToast(Toast.Style.Success, "QR Code copied to clipboard");
   } catch (error) {
     await showFailureToast(error, { title: "Failed to copy QR code" });
     throw error;

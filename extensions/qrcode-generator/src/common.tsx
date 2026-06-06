@@ -9,7 +9,7 @@ import {
   Detail,
 } from "@raycast/api";
 import { useEffect, useState } from "react";
-import { DEFAULT_COLOR, isValidHexColor } from "./config";
+import { resolveColorPreference } from "./config";
 import { generateQRCode, getQRCodePath, copyQRCodeToClipboard } from "./utils";
 import fs from "fs";
 
@@ -18,7 +18,7 @@ export default function Common({ from }: { from: "clipboard" | "selection" }) {
   const [sourceText, setSourceText] = useState<string>("");
 
   const { defaultColor } = getPreferenceValues<{ defaultColor?: string }>();
-  const color = isValidHexColor(defaultColor) ? defaultColor : DEFAULT_COLOR;
+  const color = resolveColorPreference(defaultColor);
 
   useEffect(() => {
     (async () => {

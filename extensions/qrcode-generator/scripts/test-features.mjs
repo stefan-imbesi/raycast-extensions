@@ -91,13 +91,10 @@ check(
   "buildSvgOptions keeps width 1536 + transparent",
   buildSvgOptions().width === 1536 && buildSvgOptions().color.light === "none",
 );
-check(
-  "default PNG QR renders black",
-  (() => {
-    const c = { r: 0, g: 0, b: 0 };
-    return c;
-  }) && true,
-);
+{
+  const black = await renderedColor("png", DEFAULT_COLOR);
+  check("default PNG QR renders black", approx(black.r, 0) && approx(black.g, 0) && approx(black.b, 0));
+}
 
 console.log("\n# Phase 2 — color (presets, custom hex with/without #, 3-digit), PNG + SVG");
 check("isValidHexColor accepts #1D8348", isValidHexColor("#1D8348"));

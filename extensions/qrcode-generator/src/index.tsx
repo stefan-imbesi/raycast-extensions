@@ -8,6 +8,7 @@ import {
   isLowContrast,
   isValidHexColor,
   normalizeHexColor,
+  resolveColorPreference,
 } from "./config";
 import { appendUtmParams, isHttpUrl, shortenUrl } from "./url";
 import { copyQRCodeToClipboard, generateQRCode, QRCodeView, saveQRCode } from "./utils";
@@ -95,7 +96,7 @@ export default function Command() {
   const [qrData, setQrData] = useState<string>();
 
   // The default-color preference pre-fills the custom field; the form opens directly in Custom mode.
-  const initialColor = isValidHexColor(defaultColor) ? normalizeHexColor(defaultColor) : DEFAULT_COLOR;
+  const initialColor = resolveColorPreference(defaultColor);
 
   // Tracks the current dropdown selection so customColor validation only fires when "Custom…" is active.
   const colorModeRef = useRef<string>(CUSTOM_COLOR_VALUE);
