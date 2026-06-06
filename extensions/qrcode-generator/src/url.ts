@@ -44,23 +44,43 @@ export function appendUtmParams(value: string, params: UtmParams): string {
   return url.toString();
 }
 
+/** URL shorteners that need no API key. Tried in order; first success wins. */
+const SHORTENERS: { name: string; build: (url: string) => string }[] = [
+  { name: "is.gd", build: (u) => `https://is.gd/create.php?format=simple&url=${encodeURIComponent(u)}` },
+  { name: "TinyURL", build: (u) => `https://tinyurl.com/api-create.php?url=${encodeURIComponent(u)}` },
+];
+
+async function requestShort(endpoint: string): Promise<string> {
+  // Bound the request with AbortController (broadly supported) so a slow service can't hang the submit.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(endpoint, { signal: controller.signal });
+    const body = (await response.text()).trim();
+    if (!response.ok || body.toLowerCase().startsWith("error")) {
+      throw new Error(body || `status ${response.status}`);
+    }
+    if (!isHttpUrl(body)) {
+      throw new Error(`unexpected response: ${body.slice(0, 80)}`);
+    }
+    return body;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
- * Shorten a URL via the is.gd API (no API key required).
- * Throws on failure so callers can fall back to the original URL.
+ * Shorten a URL via a no-key service (is.gd, then TinyURL as fallback).
+ * Throws with the collected provider errors if all fail.
  */
 export async function shortenUrl(value: string): Promise<string> {
-  const endpoint = `https://is.gd/create.php?format=simple&url=${encodeURIComponent(value)}`;
-  // Bound the request so a slow/unreachable is.gd can't hang the form submit indefinitely.
-  const response = await fetch(endpoint, { signal: AbortSignal.timeout(8000) });
-  const body = (await response.text()).trim();
-
-  if (!response.ok || body.toLowerCase().startsWith("error:")) {
-    throw new Error(body || `Shortener returned status ${response.status}`);
+  const errors: string[] = [];
+  for (const { name, build } of SHORTENERS) {
+    try {
+      return await requestShort(build(value));
+    } catch (error) {
+      errors.push(`${name}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
-
-  if (!isHttpUrl(body)) {
-    throw new Error("Shortener returned an unexpected response");
-  }
-
-  return body;
+  throw new Error(`Could not shorten link (${errors.join("; ")})`);
 }

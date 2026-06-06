@@ -1,6 +1,6 @@
 import { Action, ActionPanel, Form, getPreferenceValues, open, showToast, Toast } from "@raycast/api";
 import { FormValidation, showFailureToast, useForm } from "@raycast/utils";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   COLOR_PRESETS,
   CUSTOM_COLOR_VALUE,
@@ -48,8 +48,12 @@ function resolveColor(values: FormValues): string {
   return isValidHexColor(raw) ? normalizeHexColor(raw) : DEFAULT_COLOR;
 }
 
-/** Apply UTM params then (optionally) shorten, returning the final URL to encode. */
-async function prepareUrl(values: FormValues): Promise<string> {
+/**
+ * Apply UTM params then (optionally) shorten. Returns the final URL to encode,
+ * or null if shortening was requested but failed (caller should abort so the
+ * error stays visible instead of silently encoding the long URL).
+ */
+async function prepareUrl(values: FormValues): Promise<string | null> {
   let url = values.url;
 
   if (values.utmEnabled) {
@@ -64,17 +68,21 @@ async function prepareUrl(values: FormValues): Promise<string> {
 
   if (values.shorten) {
     if (!isHttpUrl(url)) {
+      // Shortening only applies to links; plain text just passes through.
       await showToast({
         style: Toast.Style.Failure,
         title: "Cannot shorten",
-        message: "Only http(s) links can be shortened.",
+        message: "Only http(s) links can be shortened — using the original content.",
       });
     } else {
+      const toast = await showToast({ style: Toast.Style.Animated, title: "Shortening link..." });
       try {
-        await showToast({ style: Toast.Style.Animated, title: "Shortening link..." });
         url = await shortenUrl(url);
+        toast.style = Toast.Style.Success;
+        toast.title = "Link shortened";
       } catch (error) {
         await showFailureToast(error, { title: "Failed to shorten link" });
+        return null;
       }
     }
   }
@@ -89,21 +97,20 @@ export default function Command() {
   const initialColor = isValidHexColor(defaultColor) ? defaultColor : DEFAULT_COLOR;
   const matchedPreset = COLOR_PRESETS.find((preset) => preset.value.toLowerCase() === initialColor.toLowerCase());
 
+  // Tracks the current dropdown selection so customColor validation only fires when "Custom…" is active.
+  const colorModeRef = useRef<string>(matchedPreset ? matchedPreset.value : CUSTOM_COLOR_VALUE);
+
   const { handleSubmit, itemProps, values } = useForm<FormValues>({
     initialValues: {
       color: matchedPreset ? matchedPreset.value : CUSTOM_COLOR_VALUE,
       customColor: initialColor,
     },
     async onSubmit(values) {
-      if (values.color === CUSTOM_COLOR_VALUE && !isValidHexColor(values.customColor)) {
-        await showFailureToast(new Error("Enter a valid hex color, e.g. #1D8348 or 1D8348"), {
-          title: "Invalid color",
-        });
-        return;
-      }
-
       const color = resolveColor(values);
       const url = await prepareUrl(values);
+      if (url === null) {
+        return; // shortening failed — error toast already shown
+      }
 
       if (values.inline) {
         try {
@@ -133,13 +140,19 @@ export default function Command() {
       }
     },
     validation: {
-      url: FormValidation.Required,
+      url: (value) => (value && value.trim() ? undefined : "URL or content is required"),
       format: FormValidation.Required,
+      // Inline (red) feedback for the custom hex field — invalid format or a color too light to scan.
+      customColor: (value) => {
+        if (colorModeRef.current !== CUSTOM_COLOR_VALUE) return undefined;
+        if (!isValidHexColor(value)) return "Enter a valid hex color, e.g. #1D8348 or 1D8348";
+        if (isLowContrast(value)) return "Low contrast — this color may be too light to scan";
+        return undefined;
+      },
     },
   });
 
-  // Persistent, reactive low-contrast warning (a toast here would be overwritten by the generate toasts).
-  const showLowContrast = isLowContrast(selectedColor(values));
+  colorModeRef.current = values.color;
 
   const renderActions = () => {
     const saveAction = (
@@ -223,16 +236,10 @@ export default function Command() {
       {values.color === CUSTOM_COLOR_VALUE && (
         <Form.TextField title="Custom Color (Hex)" placeholder="#1D8348 or 1D8348" {...itemProps.customColor} />
       )}
-      {showLowContrast && (
-        <Form.Description
-          title="⚠ Low contrast"
-          text="This color is quite light and may be hard to scan. Consider a darker color."
-        />
-      )}
       <Form.Checkbox
-        label="Shorten link (is.gd)"
+        label="Shorten link"
         {...itemProps.shorten}
-        info="Sends the URL to is.gd to create a short link."
+        info="Sends the URL to is.gd (then TinyURL) to create a short link."
       />
       <Form.Separator />
       <Form.Checkbox label="Add tracking parameters (UTM)" {...itemProps.utmEnabled} />
