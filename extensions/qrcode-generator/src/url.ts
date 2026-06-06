@@ -50,7 +50,8 @@ export function appendUtmParams(value: string, params: UtmParams): string {
  */
 export async function shortenUrl(value: string): Promise<string> {
   const endpoint = `https://is.gd/create.php?format=simple&url=${encodeURIComponent(value)}`;
-  const response = await fetch(endpoint);
+  // Bound the request so a slow/unreachable is.gd can't hang the form submit indefinitely.
+  const response = await fetch(endpoint, { signal: AbortSignal.timeout(8000) });
   const body = (await response.text()).trim();
 
   if (!response.ok || body.toLowerCase().startsWith("error:")) {

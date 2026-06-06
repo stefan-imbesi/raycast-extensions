@@ -1,11 +1,7 @@
 import { Action, ActionPanel, Form, getPreferenceValues, open, showToast, Toast } from "@raycast/api";
 import { FormValidation, showFailureToast, useForm } from "@raycast/utils";
-import fs from "fs";
-import QRCode from "qrcode";
 import { useState } from "react";
 import {
-  buildQrOptions,
-  buildSvgOptions,
   COLOR_PRESETS,
   CUSTOM_COLOR_VALUE,
   DEFAULT_COLOR,
@@ -14,7 +10,7 @@ import {
   normalizeHexColor,
 } from "./config";
 import { appendUtmParams, isHttpUrl, shortenUrl } from "./url";
-import { copyQRCodeToClipboard, generateQRCode, getQRCodePath, QRCodeView } from "./utils";
+import { copyQRCodeToClipboard, generateQRCode, QRCodeView, saveQRCode } from "./utils";
 
 type FormatValue = "png" | "svg" | "png-bg";
 
@@ -39,6 +35,51 @@ interface Preferences {
     primaryAction: "save" | "inline" | "copy";
     defaultColor?: string;
   };
+}
+
+/** The raw selected color string (a preset value or the custom hex input). */
+function selectedColor(values: FormValues): string {
+  return values.color === CUSTOM_COLOR_VALUE ? values.customColor : values.color;
+}
+
+/** The effective, normalized color to render with, falling back to black for invalid input. */
+function resolveColor(values: FormValues): string {
+  const raw = selectedColor(values);
+  return isValidHexColor(raw) ? normalizeHexColor(raw) : DEFAULT_COLOR;
+}
+
+/** Apply UTM params then (optionally) shorten, returning the final URL to encode. */
+async function prepareUrl(values: FormValues): Promise<string> {
+  let url = values.url;
+
+  if (values.utmEnabled) {
+    url = appendUtmParams(url, {
+      source: values.utmSource,
+      medium: values.utmMedium,
+      campaign: values.utmCampaign,
+      term: values.utmTerm,
+      content: values.utmContent,
+    });
+  }
+
+  if (values.shorten) {
+    if (!isHttpUrl(url)) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Cannot shorten",
+        message: "Only http(s) links can be shortened.",
+      });
+    } else {
+      try {
+        await showToast({ style: Toast.Style.Animated, title: "Shortening link..." });
+        url = await shortenUrl(url);
+      } catch (error) {
+        await showFailureToast(error, { title: "Failed to shorten link" });
+      }
+    }
+  }
+
+  return url;
 }
 
 export default function Command() {
@@ -83,18 +124,9 @@ export default function Command() {
         await copyQRCodeToClipboard({ url, format: values.format, color });
       } else {
         try {
-          const path = getQRCodePath(url, "png");
-          if (values.format === "svg") {
-            const svg = await QRCode.toString(url, { type: "svg", ...buildSvgOptions({ color }) });
-            const svgPath = path.replace(/\.png$/, ".svg");
-            fs.writeFileSync(svgPath, svg);
-            showToast(Toast.Style.Success, "QRCode saved", `You can find it here: ${svgPath}`);
-            open(svgPath);
-          } else {
-            await QRCode.toFile(path, url, buildQrOptions({ color, preview: values.format === "png-bg" }));
-            showToast(Toast.Style.Success, "QRCode saved", `You can find it here: ${path}`);
-            open(path);
-          }
+          const savedPath = await saveQRCode({ url, format: values.format, color });
+          showToast(Toast.Style.Success, "QRCode saved", `You can find it here: ${savedPath}`);
+          open(savedPath);
         } catch (error) {
           await showFailureToast(error, { title: "Failed to save QR code" });
         }
@@ -106,49 +138,8 @@ export default function Command() {
     },
   });
 
-  function resolveColor(values: FormValues): string {
-    if (values.color === CUSTOM_COLOR_VALUE) {
-      return isValidHexColor(values.customColor) ? normalizeHexColor(values.customColor) : DEFAULT_COLOR;
-    }
-    return normalizeHexColor(values.color);
-  }
-
   // Persistent, reactive low-contrast warning (a toast here would be overwritten by the generate toasts).
-  const selectedColorRaw = values.color === CUSTOM_COLOR_VALUE ? values.customColor : values.color;
-  const showLowContrast = isValidHexColor(selectedColorRaw) && isLowContrast(normalizeHexColor(selectedColorRaw));
-
-  async function prepareUrl(values: FormValues): Promise<string> {
-    let url = values.url;
-
-    if (values.utmEnabled) {
-      url = appendUtmParams(url, {
-        source: values.utmSource,
-        medium: values.utmMedium,
-        campaign: values.utmCampaign,
-        term: values.utmTerm,
-        content: values.utmContent,
-      });
-    }
-
-    if (values.shorten) {
-      if (!isHttpUrl(url)) {
-        await showToast({
-          style: Toast.Style.Failure,
-          title: "Cannot shorten",
-          message: "Only http(s) links can be shortened.",
-        });
-      } else {
-        try {
-          await showToast({ style: Toast.Style.Animated, title: "Shortening link..." });
-          url = await shortenUrl(url);
-        } catch (error) {
-          await showFailureToast(error, { title: "Failed to shorten link" });
-        }
-      }
-    }
-
-    return url;
-  }
+  const showLowContrast = isLowContrast(selectedColor(values));
 
   const renderActions = () => {
     const saveAction = (

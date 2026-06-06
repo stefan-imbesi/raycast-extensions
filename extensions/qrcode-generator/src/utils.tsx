@@ -71,6 +71,26 @@ export const getQRCodePath = (qrcodeUrl: string, format: "png" | "svg" = "png") 
   return `${homedir()}/Downloads/qrcode-${filename}.${format}`;
 };
 
+/** Write a QR code to ~/Downloads in the given format/color and return the saved file path. */
+export async function saveQRCode(options: {
+  url: string;
+  format: "png" | "svg" | "png-bg";
+  color?: string;
+}): Promise<string> {
+  const { url, format, color = DEFAULT_COLOR } = options;
+  const basePath = getQRCodePath(url, "png");
+
+  if (format === "svg") {
+    const svg = await QRCode.toString(url, { type: "svg", ...buildSvgOptions({ color }) });
+    const svgPath = basePath.replace(/\.png$/, ".svg");
+    fs.writeFileSync(svgPath, svg);
+    return svgPath;
+  }
+
+  await QRCode.toFile(basePath, url, buildQrOptions({ color, preview: format === "png-bg" }));
+  return basePath;
+}
+
 export async function copyQRCodeToClipboard(options: {
   url: string;
   format: "png" | "svg" | "png-bg";
