@@ -23,7 +23,7 @@
       "subtitle": "QR Code Generator",
       "description": "Generate a QR code from text or URL",
       "mode": "view",
-      "icon": "generate-icon.png",
+      "icon": "generate-qr-icon.png",
       "preferences": [
         {
           "name": "primaryAction",
