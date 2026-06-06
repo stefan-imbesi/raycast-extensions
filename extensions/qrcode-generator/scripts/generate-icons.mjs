@@ -13,7 +13,7 @@ const lucideDir = join(here, "..", "node_modules", "lucide-static", "icons");
 // Distinct color + glyph per command. At small list sizes color is the primary
 // differentiator, so each command gets its own vibrant background plus a bold white glyph.
 const icons = {
-  "generate-icon.png": { glyph: "qr-code", bg: "#2563EB" }, // blue
+  "generate-icon.png": { glyph: "qr-code", bg: "#ED4949" }, // red (matches the published icon)
   "clipboard-icon.png": { glyph: "clipboard-copy", bg: "#059669" }, // emerald
   "selection-icon.png": { glyph: "text-cursor", bg: "#7C3AED" }, // violet
 };
