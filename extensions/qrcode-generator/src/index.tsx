@@ -228,21 +228,20 @@ export default function Command() {
         <Form.Dropdown.Item value="png-bg" title="PNG (w/BG)" />
         <Form.Dropdown.Item value="svg" title="SVG" />
       </Form.Dropdown>
-      <Form.Dropdown title="QR Color" {...itemProps.color}>
+      <Form.Dropdown
+        title="QR Color"
+        {...itemProps.color}
+        // Low-contrast warning lives on the (unfocused) dropdown so it renders inline like other
+        // field errors, instead of as a focused-field popover on the hex input. Non-blocking.
+        error={showLowContrast ? "Low contrast — may be hard to scan" : undefined}
+      >
         {COLOR_PRESETS.map((preset) => (
           <Form.Dropdown.Item key={preset.value} value={preset.value} title={preset.title} />
         ))}
         <Form.Dropdown.Item value={CUSTOM_COLOR_VALUE} title="Custom…" />
       </Form.Dropdown>
       {values.color === CUSTOM_COLOR_VALUE && (
-        <Form.TextField
-          title="Custom Color (Hex)"
-          placeholder="#1D8348 or 1D8348"
-          {...itemProps.customColor}
-          // Red like other field errors. Invalid hex (in `validation`) blocks submit; the
-          // low-contrast message is set here only for display, so it warns without blocking.
-          error={itemProps.customColor.error ?? (showLowContrast ? "Low contrast — may be hard to scan" : undefined)}
-        />
+        <Form.TextField title="Custom Color (Hex)" placeholder="#1D8348 or 1D8348" {...itemProps.customColor} />
       )}
       <Form.Checkbox
         label="Shorten link"
